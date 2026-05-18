@@ -231,7 +231,6 @@ function uid(){return 'm'+Date.now().toString(36)+Math.random().toString(36).sli
 
 function render(){
   var app=document.getElementById('app');if(!app)return;
-  if(!isReady()){app.innerHTML=rSetup();bSetup();return;}
   if(S.loading){app.innerHTML='<div class="loading"><div class="sp"></div>불러오는 중...</div>';return;}
   app.innerHTML=rApp();bAll();
 }
@@ -381,7 +380,7 @@ function bRows(){
       var wks=S.rptWeek?aw.filter(function(w){return w.num===+S.rptWeek;}):aw;
       wks.forEach(function(w){
         S.members.filter(function(m){return(m.studyIds||[]).indexOf(s.id)>=0;}).forEach(function(m){
-          rows.push({mem:m.name,study:s.name,cat:s.cat,week:w.num,tw:aw.length,locked:w.locked,st:ck(s.id,w.num,m.id)});
+          rows.push({mem:m.name,mid:m.id,study:s.name,sid:s.id,cat:s.cat,week:w.num,tw:aw.length,locked:w.locked,st:ck(s.id,w.num,m.id)});
         });
       });
     });
@@ -390,7 +389,7 @@ function bRows(){
     ms2.forEach(function(m){
       S.studies.filter(function(s){return s.active&&(m.studyIds||[]).indexOf(s.id)>=0;}).forEach(function(s){
         allWeeks(s).forEach(function(w){
-          rows.push({mem:m.name,study:s.name,cat:s.cat,week:w.num,tw:allWeeks(s).length,locked:w.locked,st:ck(s.id,w.num,m.id)});
+          rows.push({mem:m.name,mid:m.id,study:s.name,sid:s.id,cat:s.cat,week:w.num,tw:allWeeks(s).length,locked:w.locked,st:ck(s.id,w.num,m.id)});
         });
       });
     });
@@ -428,14 +427,41 @@ function rRP(){
   if(rows.length>0){
     var tr=rows.map(function(r){
       var badge=r.st==='done'?'<span class="bd">✓인증</span>':r.st==='vacation'?'<span class="bv">🏖️휴가</span>':'<span class="bw">미인증</span>';
+      var ekey=r.sid+'__'+r.week+'__'+r.mid;
+      var isEdit=S.editKey===ekey;
+      var editBadge=isEdit
+        ?'<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">'+
+          '<button class="rpt-pick" data-pick="'+ekey+'__done" style="font-size:11px;padding:3px 8px;border-radius:20px;background:var(--grb);color:#16A34A;border:1.5px solid #BBF7D0;cursor:pointer;font-weight:700;">✅ 인증</button>'+
+          '<button class="rpt-pick" data-pick="'+ekey+'__vacation" style="font-size:11px;padding:3px 8px;border-radius:20px;background:var(--bll);color:var(--bld);border:1.5px solid #BFDBFE;cursor:pointer;font-weight:700;">🏖️ 휴가</button>'+
+          '<button class="rpt-pick" data-pick="'+ekey+'__none" style="font-size:11px;padding:3px 8px;border-radius:20px;background:var(--orb);color:#D97706;border:1.5px solid #FDE68A;cursor:pointer;">⏳ 미인증</button>'+
+          '<button class="rpt-cancel" style="font-size:10px;padding:2px 6px;border-radius:20px;border:1px solid var(--br);background:transparent;cursor:pointer;color:var(--mu);">✕</button>'+
+          '</div>'
+        :'<span class="rpt-edit-btn" data-edit="'+ekey+'" style="cursor:pointer;display:inline-flex;align-items:center;gap:2px;">'+badge+'<span style="font-size:9px;color:var(--mu);">✏️</span></span>';
       return '<tr><td style="font-weight:500;white-space:nowrap;">'+esc(r.mem)+'</td><td>'+esc(r.study)+'</td>'+
-        '<td style="white-space:nowrap;">'+(r.locked?'🔒':'')+r.week+'/'+r.tw+'주</td><td>'+badge+'</td></tr>';
+        '<td style="white-space:nowrap;">'+(r.locked?'🔒':'')+r.week+'/'+r.tw+'주</td><td>'+editBadge+'</td></tr>';
     }).join('');
     tb='<div class="tscroll"><table class="rtable"><thead><tr><th>멤버</th><th>스터디</th><th>주차</th><th>상태</th></tr></thead><tbody>'+tr+'</tbody></table></div>'+
       '<div style="display:flex;gap:8px;"><button class="abtn" id="rcs" style="flex:1;">📥 CSV 다운로드</button>'+
       '<button class="abtn sec" id="rcp" style="flex:1;">📋 구글시트 복사</button></div>';
   } else {tb='<div class="empty">조회 결과가 없어요</div>';}
   return '<div class="stack">'+f+sm+tb+'</div>';
+}
+
+function bindRptEdit(){
+  document.querySelectorAll('.rpt-edit-btn').forEach(function(el){
+    el.addEventListener('click',function(){S.editKey=el.dataset.edit;render();});
+  });
+  document.querySelectorAll('.rpt-cancel').forEach(function(el){
+    el.addEventListener('click',function(){S.editKey=null;render();});
+  });
+  document.querySelectorAll('.rpt-pick').forEach(function(el){
+    el.addEventListener('click',function(){
+      var p=el.dataset.pick.split('__');
+      var sid=p[0],wn=+p[1],mid=p[2],val=p[3];
+      setCk(sid,wn,mid,val==='none'?null:val);
+      S.editKey=null;persist();
+    });
+  });
 }
 
 function xCsv(){
@@ -628,6 +654,7 @@ function bAll(){
   var rws=g('rws');if(rws)rws.addEventListener('change',function(e){S.rptWeek=e.target.value;render();});
   var rms=g('rms');if(rms)rms.addEventListener('change',function(e){S.rptMid=e.target.value;render();});
   on('rcs',xCsv);on('rcp',xCopy);
+  bindRptEdit();
 
   // 주차 잠금/열기
   document.querySelectorAll('[data-lock]').forEach(function(el){
