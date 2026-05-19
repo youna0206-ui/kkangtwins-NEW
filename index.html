@@ -222,7 +222,7 @@ var S={
   adminPw:'',adminErr:'',memberPw:'',memberErr:'',selMemId:'',
   newMember:'',expandedMem:null,selStudyId:null,
   chgCur:'',chgNew:'',chgNew2:'',chgErr:'',chgOk:'',
-  rptMode:'study',rptSid:'',rptMid:'',rptWeek:'',
+  rptMode:'study',rptSid:'',rptMid:'',rptWeek:'',editKey:null,viewMemberId:null,
   setupUrl:'',setupErr:''
 };
 
@@ -354,6 +354,42 @@ function rCP(){
 
 function rOV(){
   if(!S.isAdmin)return rAL();
+  // 멤버 상세 뷰
+  if(S.viewMemberId){
+    var vm=S.members.filter(function(x){return x.id===S.viewMemberId;})[0];
+    if(vm){
+      var myStudies=S.studies.filter(function(s){return s.active&&(vm.studyIds||[]).indexOf(s.id)>=0;});
+      var tot=memTotalStats(vm);
+      var h='<div class="stack">'+
+        '<div class="sec rb" style="padding:.875rem 1rem;">'+
+          '<div><div style="font-size:15px;font-weight:700;">'+esc(vm.name)+'님 인증 현황</div>'+
+            '<div style="font-size:12px;color:var(--mu);margin-top:2px;">누적 ✅'+tot.dw+'/'+tot.tw+'주 · '+tot.pct+'%</div></div>'+
+          '<button class="abtn sec" id="vm-back" style="font-size:12px;padding:4px 10px;">← 목록으로</button>'+
+        '</div>';
+      if(!myStudies.length){h+='<div class="empty">참여 스터디 없어요</div>';}
+      myStudies.forEach(function(s){
+        var aw=allWeeks(s);
+        h+='<div class="card" style="padding:.875rem 1rem;">'+
+          '<div style="font-size:14px;font-weight:600;margin-bottom:8px;">'+esc(s.name)+'</div>';
+        aw.forEach(function(w){
+          var status=ck(s.id,w.num,vm.id);var isOpen=!w.locked;
+          h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+            '<span class="wk-chip '+(isOpen?'wk-open':'wk-locked')+'">'+(isOpen?'🔓':'🔒')+' '+w.num+'주차</span>';
+          if(isOpen){
+            h+='<button class="sbtn'+(status==='done'?' done':'')+'" data-ack="'+vm.id+'__'+s.id+'__'+w.num+'__done">✅ 인증</button>'+
+              '<button class="sbtn'+(status==='vacation'?' vac':'')+'" data-ack="'+vm.id+'__'+s.id+'__'+w.num+'__vacation">🏖️ 휴가</button>'+
+              (status?'<button class="sbtn" data-ack="'+vm.id+'__'+s.id+'__'+w.num+'__none" style="font-size:11px;">✕ 취소</button>':'');
+          } else {
+            h+=(status==='done'?'<span class="bd">✓ 인증완료</span>':status==='vacation'?'<span class="bv">🏖️ 휴가</span>':'<span style="font-size:12px;color:var(--mu);">미인증</span>');
+          }
+          h+='</div>';
+        });
+        h+='</div>';
+      });
+      h+='</div>';
+      return h;
+    }
+  }
   var ad=S.members.filter(function(m){var s=memCurStats(m);return s.total>0&&s.done===s.total;}).length;
   var h='<div class="stack"><div style="display:flex;gap:8px;">'+
     '<div class="stat-box"><div class="stat-label">전체 멤버</div><div class="stat-num" style="color:var(--pr);">'+S.members.length+'</div></div>'+
@@ -362,7 +398,7 @@ function rOV(){
     '</div>';
   S.members.forEach(function(m){
     var s=memCurStats(m);var t=memTotalStats(m);
-    h+='<div class="mprog"><div class="rb"><div style="font-size:14px;font-weight:600;">'+esc(m.name)+'</div>'+
+    h+='<div class="mprog" style="cursor:pointer;" data-vmem="'+m.id+'"><div class="rb"><div style="font-size:14px;font-weight:600;">'+esc(m.name)+' <span style="font-size:11px;color:var(--pr);">→</span></div>'+
       '<div style="display:flex;gap:5px;align-items:center;"><span style="font-size:11px;color:var(--mu);">누적 '+t.dw+'/'+t.tw+'주</span>'+
       '<span style="font-size:12px;font-weight:700;color:'+(t.pct>=80?'var(--gr)':t.pct>=50?'var(--pr)':'var(--or)')+';">'+t.pct+'%</span></div></div>'+
       '<div class="pb" style="height:8px;margin:6px 0 3px;"><div class="pb-f" style="width:'+t.pct+'%;"></div></div>'+
@@ -655,6 +691,20 @@ function bAll(){
   var rms=g('rms');if(rms)rms.addEventListener('change',function(e){S.rptMid=e.target.value;render();});
   on('rcs',xCsv);on('rcp',xCopy);
   bindRptEdit();
+  // 전체현황 멤버 클릭
+  document.querySelectorAll('[data-vmem]').forEach(function(el){
+    el.addEventListener('click',function(){S.viewMemberId=el.dataset.vmem;S.tab='overall';render();});
+  });
+  var vmb=document.getElementById('vm-back');
+  if(vmb)vmb.addEventListener('click',function(){S.viewMemberId=null;render();});
+  // 관리자가 멤버 인증 직접 수정
+  document.querySelectorAll('[data-ack]').forEach(function(el){
+    el.addEventListener('click',function(){
+      var p=el.dataset.ack.split('__');
+      var mid=p[0],sid=p[1],wn=+p[2],val=p[3];
+      setCk(sid,wn,mid,val==='none'?null:val);persist();
+    });
+  });
 
   // 주차 잠금/열기
   document.querySelectorAll('[data-lock]').forEach(function(el){
