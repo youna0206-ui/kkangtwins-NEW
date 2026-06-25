@@ -95,6 +95,8 @@ select:focus{outline:none;border-color:var(--pr)}
 .stab-btn{flex:0 0 auto;padding:.4rem .875rem;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;border:1.5px solid var(--br);background:var(--wh);color:var(--mu)}
 .stab-btn.on{border-color:var(--pr);background:var(--prl);color:var(--pr);font-weight:700}
 .apply-card{background:var(--wh);border:1.5px solid #F3D0E9;border-radius:var(--r);padding:.875rem 1rem}
+.wk-curweek{background:linear-gradient(135deg,#F59E0B,#EF4444)!important;color:#fff!important;border-color:transparent!important;font-weight:800!important;box-shadow:0 2px 10px rgba(245,158,11,.5)!important;animation:pulse-wk 1.5s ease-in-out infinite!important;}
+@keyframes pulse-wk{0%,100%{box-shadow:0 2px 10px rgba(245,158,11,.4);}50%{box-shadow:0 2px 18px rgba(245,158,11,.8);}}
 .scard{background:var(--wh);border:1.5px solid #F3D0E9;border-radius:var(--r);overflow:hidden;transition:opacity .15s}
 .scard.dragging{opacity:.4}
 .scard.dragover{border-top:3px solid var(--pr)}
@@ -190,6 +192,10 @@ document.addEventListener('click',function(e){
   if(expci){e.stopPropagation();var id=expci.dataset.expci;S.expandedCI[id]=!S.expandedCI[id];render();return;}
   var wnttog=e.target.closest&&e.target.closest('[data-wnttog]');
   if(wnttog){e.stopPropagation();var wk=wnttog.dataset.wnttog;S.expandedWnote[wk]=!S.expandedWnote[wk];render();return;}
+  var allopen=e.target.closest&&e.target.closest('[data-allopen]');
+  if(allopen){e.stopPropagation();var s=S.studies.filter(function(x){return x.id===allopen.dataset.allopen;})[0];if(s&&s.weeks){s.weeks.forEach(function(w){w.locked=false;});persist();}return;}
+  var alllock=e.target.closest&&e.target.closest('[data-alllock]');
+  if(alllock){e.stopPropagation();var s2=S.studies.filter(function(x){return x.id===alllock.dataset.alllock;})[0];if(s2&&s2.weeks){s2.weeks.forEach(function(w){w.locked=true;});persist();}return;}
 });
 
 function rApp(){
@@ -264,7 +270,7 @@ function rCI(){
       h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:.875rem 1rem;cursor:pointer;" data-expci="'+s.id+'">'+
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
           '<span style="font-size:14px;font-weight:700;">'+esc(s.name)+'</span>'+
-          (s.dayOfWeek?'<span style="font-size:11px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--pr),#7B2FF7);padding:3px 9px;border-radius:20px;">📅 '+esc(s.dayOfWeek)+'요일</span>':'')+
+          (s.dayOfWeek?'<span style="font-size:11px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--pr),#7B2FF7);padding:3px 9px;border-radius:20px;">📅 '+esc(s.dayOfWeek)+'요일 시작</span>':'')+
           (isStudyComplete(s,m)?'<span style="font-size:11px;font-weight:700;color:#fff;background:linear-gradient(135deg,#F59E0B,#EF4444);padding:3px 10px;border-radius:20px;">🏆 완주!</span>':'')+
         '</div>'+
         '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'+
@@ -296,10 +302,9 @@ function rCI(){
           var matUnlocked=w.num===1||(prevW!==undefined&&prevCk==='done');
           var hasMat=w.materialUrl&&w.materialUrl.trim()!=='';
           h+='<div style="margin-bottom:8px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:'+(hasMat||w.note?'5px':'0')+';">'+
-            '<span class="wk-chip '+(isOpen?'wk-open':'wk-locked')+'"'+(isCurWk?' style="outline:2px solid #F59E0B;outline-offset:1px;font-weight:800;"':'')+'>'+
-            (isCurWk?'⭐ ':'')+(isOpen?'🔓':'🔒')+' '+w.num+'주차'+(isCurWk?' (이번주)':'')+
+          '<span class="wk-chip '+(isOpen?'wk-open':'wk-locked')+(isCurWk?' wk-curweek':'')+'">'+(isCurWk?'⭐ ':'')+(isOpen?'🔓':'🔒')+' '+w.num+'주차'+(isCurWk?' ← 이번주':'')+
           '</span>';
-          if(isOpen){
+                    if(isOpen){
             h+='<button class="sbtn'+(status==='done'?' done':'')+'" data-ck="'+m.id+'__'+s.id+'__'+w.num+'__done">✅ 인증</button>'+
               '<button class="sbtn'+(status==='vacation'?' vac':'')+'" data-ck="'+m.id+'__'+s.id+'__'+w.num+'__vacation">🏖️ 휴가</button>';
           } else {
@@ -723,6 +728,14 @@ function rOV(){
   if(completeData.length){
     var completeCats=[];
     completeData.forEach(function(d){if(completeCats.indexOf(d.study.cat)<0)completeCats.push(d.study.cat);});
+    // 카테고리 순서: catOrder 기준, 없으면 지정순서 사용
+    var catPriority=['입문스터디','엄세스','방출스터디','멤버전용'];
+    completeCats.sort(function(a,b){
+      var orderA=S.catOrder.length?S.catOrder.indexOf(a):catPriority.indexOf(a);
+      var orderB=S.catOrder.length?S.catOrder.indexOf(b):catPriority.indexOf(b);
+      if(orderA<0)orderA=999;if(orderB<0)orderB=999;
+      return orderA-orderB;
+    });
     h+='<div style="background:linear-gradient(135deg,#FFFBEB,#FFF7ED);border:1.5px solid #FDE68A;border-radius:var(--r);padding:.875rem 1rem;">'+
       '<div style="font-size:13px;font-weight:700;color:#D97706;margin-bottom:10px;">🏆 완주 현황</div>';
     completeCats.forEach(function(cat){
@@ -904,7 +917,7 @@ function rST(){
             '<input type="date" value="'+esc(s.startDate||'')+'" data-sdate="'+s.id+'" style="font-size:11px;padding:2px 4px;border-radius:6px;border:1.5px solid var(--br);background:var(--wh);flex-shrink:0;width:110px;" title="스터디 시작일">'+
             '<select data-dow="'+s.id+'" style="font-size:11px;padding:2px 4px;border-radius:6px;border:1.5px solid var(--br);background:var(--wh);flex-shrink:0;width:58px;">'+
               '<option value="" '+(s.dayOfWeek===''?'selected':'')+'>요일</option>'+
-              ['월','화','수','목','금','토','일'].map(function(d){return '<option value="'+d+'" '+(s.dayOfWeek===d?'selected':'')+'>'+d+'요일 시작</option>';}).join('')+
+              ['월','화','수','목','금','토','일'].map(function(d){return '<option value="'+d+'" '+(s.dayOfWeek===d?'selected':'')+'>'+d+'요일</option>';}).join('')+
             '</select>'+
             // 활성
             '<button class="tgl '+(s.active?'on':'off')+'" data-stg="'+s.id+'" style="flex-shrink:0;"></button>'+
@@ -964,19 +977,19 @@ function rST(){
           '</div>'+
           // 주차 관리 섹션
           '<div style="border-top:1px solid #F3D0E9;">'+
-            '<div style="display:flex;align-items:center;gap:6px;padding:.35rem .75rem;background:#FAFAFA;">'+
-              '<div style="display:flex;align-items:center;gap:4px;flex:1;cursor:pointer;" data-expw="'+s.id+'">'+
-                '<span style="font-size:12px;color:var(--mu);">📅 주차 관리</span>'+
-                '<span style="font-size:12px;color:var(--mu);margin-left:auto;">'+aw.length+'주차 '+(isExpW?'▲':'▼')+'</span>'+
+            '<div style="display:flex;align-items:center;gap:5px;padding:.35rem .75rem;background:#FAFAFA;">'+
+              '<span style="font-size:12px;color:var(--mu);">📅 주차 관리</span>'+
+              '<button class="lock-btn open" data-allopen="'+s.id+'" style="font-size:10px;">🔓 전체열기</button>'+
+              '<button class="lock-btn locked" data-alllock="'+s.id+'" style="font-size:10px;">🔒 전체잠금</button>'+
+              '<div style="flex:1;"></div>'+
+              '<div style="display:flex;align-items:center;gap:4px;cursor:pointer;" data-expw="'+s.id+'">'+
+                '<span style="font-size:12px;color:var(--mu);">'+aw.length+'주차</span>'+
+                '<span style="font-size:12px;color:var(--mu);">'+(isExpW?'▲':'▼')+'</span>'+
               '</div>'+
-
             '</div>'+
             (isExpW?
               '<div style="padding:.5rem .75rem .75rem;">'+
-                '<div style="display:flex;gap:6px;margin-bottom:8px;">'+
-                  '<button style="flex:1;padding:.4rem;border-radius:var(--rs);border:1.5px solid var(--gr);background:var(--grb);color:#16A34A;cursor:pointer;font-size:12px;font-weight:700;" data-allopen="'+s.id+'">🔓 전체 열기</button>'+
-                  '<button style="flex:1;padding:.4rem;border-radius:var(--rs);border:1.5px solid #E5E7EB;background:#F3F4F6;color:var(--mu);cursor:pointer;font-size:12px;font-weight:700;" data-alllock="'+s.id+'">🔒 전체 잠금</button>'+
-                '</div>'+
+
                 aw.map(function(w){
                   return '<div style="background:#F9F9F9;border:1px solid #F3D0E9;border-radius:var(--rs);padding:.45rem .7rem;margin-bottom:5px;">'+
                     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">'+
@@ -1457,18 +1470,7 @@ function bAll(){
     s.weeks.sort(function(a,b){return a.num-b.num;});if(inp)inp.value='';
     if(!added)alert('이미 1~'+total+'주차가 모두 있어요!');persist();
   });});
-  // 전체 열기
-  qsa('[data-allopen]',function(el){el.addEventListener('click',function(){
-    var s=S.studies.filter(function(x){return x.id===el.dataset.allopen;})[0];if(!s)return;
-    if(!s.weeks||!s.weeks.length){alert('주차가 없어요. 먼저 주차를 생성해주세요.');return;}
-    s.weeks.forEach(function(w){w.locked=false;});persist();
-  });});
-  // 전체 잠금
-  qsa('[data-alllock]',function(el){el.addEventListener('click',function(){
-    var s=S.studies.filter(function(x){return x.id===el.dataset.alllock;})[0];if(!s)return;
-    if(!s.weeks||!s.weeks.length){alert('주차가 없어요.');return;}
-    s.weeks.forEach(function(w){w.locked=true;});persist();
-  });});
+  // allopen/alllock: 앱 레벨 위임으로 처리
   // 다음 주차
   qsa('[data-addnext]',function(el){el.addEventListener('click',function(){
     var s=S.studies.filter(function(x){return x.id===el.dataset.addnext;})[0];if(!s)return;
