@@ -239,9 +239,14 @@ function rAL(){
     '<button class="abtn full" id="adl">로그인</button></div></div></div>';
 }
 function rCI(){
-  if(S.isAdmin)return '<div class="sec" style="text-align:center;font-size:14px;color:var(--pr);font-weight:600;">리포트 탭에서 인증현황을 확인하세요</div>';
-  if(!S.loggedMember)return rML();
-  var m=S.loggedMember;
+  var m;
+  if(S.isAdmin){
+    m=S.members.filter(function(x){return x.name&&x.name.indexOf('강둥맘')>=0;})[0];
+    if(!m)return '<div class="sec" style="text-align:center;font-size:14px;color:var(--mu);">강둥맘 멤버를 찾을 수 없어요</div>';
+  } else {
+    if(!S.loggedMember)return rML();
+    m=S.loggedMember;
+  }
   var my=S.studies.filter(function(s){return s.active&&(m.studyIds||[]).indexOf(s.id)>=0;});
   var st=mCurSt(m);
   var h='<div class="stack"><div class="sec rb" style="padding:.875rem 1rem;">'+
